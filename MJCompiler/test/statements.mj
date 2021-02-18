@@ -1,0 +1,45 @@
+program StatementsTest
+
+const char C11 = 'a', C12 = 'b';
+const int I11 = 10 , I12 = 20;
+const bool B11 = true, B12 = false;
+
+const char C21 = 'c';
+const int I21 = 30;
+const bool B21 = true;
+
+int i11, i12[], i13;
+char c11, c12[], c13;
+bool b11, b12[], b13;
+
+int i21;
+char c21;
+bool b21;
+
+int i31[];
+char c31[];
+bool b31[];
+
+{
+	void main() 
+	{
+		i11 = I11;
+		i13 = 13;
+		i12 = new int[12];
+		i31 = new int[I12];
+		i31 = new int[i13];
+		
+		i13 = i31[0];
+		i13 = i31[i11];
+		i13 = i31[5 + i13];
+		
+		i11 = I11*13 + i12[2]*3*i11 + (B11?i11:i12[i11 + 2]);
+		
+		print(i11);
+		print(i11, 5);
+		print(i12[i11] + 2);
+		
+		read(i11);
+		read(i12[0]);
+	}
+}

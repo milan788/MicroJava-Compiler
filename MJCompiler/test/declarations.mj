@@ -1,0 +1,49 @@
+program GlobalConstAndVarDecls 
+
+const char C11 = 'a', C12 = 'b';
+const int I11 = 10 , I12 = 20;
+const bool B11 = true, B12 = false;
+
+const char C21 = 'c';
+const int I21 = 30;
+const bool B21 = true;
+
+int i11, i12[], i13;
+char c11, c12[], c13;
+bool b11, b12[], b13;
+
+int i21;
+char c21;
+bool b21;
+
+int i31[];
+char c31[];
+bool b31[];
+
+{
+	void fVoidNoArgs() {}
+	int fNoArgs() {}
+	void fVoidOneArg(int iArg1) {}
+	char fOneArg(bool bArg1) {}
+	bool fManyArgs(int iArg1, bool bArg2, char cArg3) {}
+	
+	void main() 
+		int main_i, main_arr_i[];
+		char main_c;
+		bool main_b;
+	{}
+	
+	int fManyArgsAndVars
+	(
+		char cArrArg1[], 
+		bool bArg2, 
+		int iArg3, 
+		char cArg4, 
+		bool bArrArg5[]
+	)
+		char fVar1;
+		int iVar2, iVar3;
+		bool bVar1, bArrVar1[];
+		int iArrVar1[], iVar1;
+	{}
+}

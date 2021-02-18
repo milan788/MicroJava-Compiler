@@ -1,0 +1,432 @@
+package rs.ac.bg.etf.pp1;
+import org.apache.log4j.Logger;
+
+import rs.ac.bg.etf.pp1.ast.*;
+import rs.etf.pp1.symboltable.Tab;
+import rs.etf.pp1.symboltable.concepts.Obj;
+import rs.etf.pp1.symboltable.concepts.Struct;
+
+public class SemanticPass extends VisitorAdaptor {
+
+	boolean errorDetected = false;
+	int printCallCount = 0;
+	Logger log = Logger.getLogger(getClass());
+
+	public void report_error(String message, SyntaxNode info) {
+		errorDetected = true;
+		StringBuilder msg = new StringBuilder(message);
+		int line = (info == null) ? 0: info.getLine();
+		if (line != 0)
+			msg.append (" na liniji ").append(line);
+		log.error(msg.toString());
+	}
+
+	public void report_info(String message, SyntaxNode info) {
+		StringBuilder msg = new StringBuilder(message); 
+		int line = (info == null) ? 0: info.getLine();
+		if (line != 0)
+			msg.append (" na liniji ").append(line);
+		log.info(msg.toString());
+	}
+	
+//Program=============================================================================================================
+	public int nVars;
+	
+	public void visit(Program program) {		
+		nVars = Tab.currentScope.getnVars();
+		Tab.chainLocalSymbols(program.getProgName().obj);
+		
+		Obj mainFunctionObj = Table.find("main");
+		if(mainFunctionObj.equals(Tab.noObj)) errorDetected = true;
+		if(!mainFunctionObj.getType().equals(Tab.noType)) errorDetected = true;
+		//if(mainFunctionObj.getFpPos() > 0) errorDetected = true;
+		
+		if(errorDetected) {
+			report_error("Nije pronadjena main funkcija", null);
+		}
+		
+		Tab.closeScope();
+	}
+
+	public void visit(ProgName progName) {
+		progName.obj = Table.insert(Obj.Prog, progName.getProgName(), Table.noType);
+		Tab.openScope(); 	
+	}
+//Const declarations=====================================================================================================
+	private Struct currentConstType;
+	
+	@Override
+	public void visit(ConstDeclarations constDeclarations) {
+		currentConstType = null;
+	}
+	
+	@Override
+	public void visit(ConstDeclarionForInt constDeclarionForInt) {
+		if(!currentConstType.equals(Table.intType)) {
+			report_error("Dodeljena vrednost ne predstavlja int vrednost ", constDeclarionForInt);
+		}
+		
+		String 	constName  = constDeclarionForInt.getConstName();
+		Integer constValue = constDeclarionForInt.getNumConst();
+		
+		Obj obj = insertAndCheck(Obj.Con, constName, currentConstType, constDeclarionForInt);
+		obj.setAdr(constValue);
+		
+		report_info("Definisana konstanta" + constName + " = " + constValue, constDeclarionForInt);
+	}
+	
+	@Override
+	public void visit(ConstDeclarionForChar constDeclarionForChar) {
+		if(!currentConstType.equals(Table.charType)) {
+			report_error("Dodeljena vrednost ne predstavlja char vrednost ", constDeclarionForChar);
+		}
+		
+		String 	  constName  = constDeclarionForChar.getConstName();
+		Character constValue = constDeclarionForChar.getCharConst();
+		
+		Obj obj = insertAndCheck(Obj.Con, constName, currentConstType, constDeclarionForChar);
+		obj.setAdr(constValue);
+		
+		report_info("Definisana konstanta" + constName + " = " + constValue, constDeclarionForChar);
+	}
+	
+	@Override
+	public void visit(ConstDeclarionForBool constDeclarionForBool) {
+		if(!currentConstType.equals(Table.boolType)) {
+			report_error("Dodeljena vrednost ne predstavlja bool vrednost ", constDeclarionForBool);
+		}
+		
+		String  constName  = constDeclarionForBool.getConstName();
+		Boolean constValue = constDeclarionForBool.getBoolConst();
+		
+		Obj obj = insertAndCheck(Obj.Con, constName, currentConstType, constDeclarionForBool);
+		obj.setAdr(constValue == Boolean.TRUE ? 1 : 0);
+		
+		report_info("Definisana konstanta" + constName + " = " + constValue, constDeclarionForBool);
+	}
+	
+	@Override
+	public void visit(ConstDeclarationsType constDeclarationsType) {
+		currentConstType = constDeclarationsType.getType().struct;
+		
+		if(currentConstType.compatibleWith(Table.intType) && 
+		   currentConstType.compatibleWith(Table.charType) && 
+		   currentConstType.compatibleWith(Table.boolType)
+		   ) {
+			report_error("Nedozvoljen tip za konstantu", constDeclarationsType);
+		}
+	}
+	
+//Var declarations=====================================================================================================
+	private Struct currentVarType;
+	
+	@Override
+	public void visit(VarDeclarations varDeclarations) {
+		currentVarType = null;
+	}
+	
+	public void visit(VarDeclarationForType varDecl) {
+		String varName = varDecl.getVarName();
+		Obj    varNode = insertAndCheck(Obj.Var, varName, currentVarType, varDecl);
+		varDecl.obj = varNode;
+		
+		report_info("Deklarisana promenljiva "+ varName, varDecl);
+	}
+	
+	@Override
+	public void visit(ArrayDeclarationForType arrayDeclarationForType) {
+		String arrayName = arrayDeclarationForType.getVarName();
+		Struct arrayType = new Struct(Struct.Array, currentVarType);
+		Obj    varNode   = insertAndCheck(Obj.Var, arrayName, arrayType, arrayDeclarationForType);
+		arrayDeclarationForType.obj = varNode;
+		
+		report_info("Deklarisan niz "+ arrayName, arrayDeclarationForType);
+	}
+	
+	@Override
+	public void visit(VarDeclarationType varDeclarationsType) {
+		currentVarType = varDeclarationsType.getType().struct;
+	}
+	
+//Method declarations======================================================================================
+	private int formalParamCnt;
+	
+	@Override
+	public void visit(MethodDeclaration methodDeclaration) {	
+		Obj methObj = methodDeclaration.getMethTypeName().obj;
+		Tab.chainLocalSymbols(methObj);
+		Tab.closeScope();
+		report_info("Deklarisana funkcija: " + methObj.getName(), methodDeclaration);
+	}
+	
+	
+	@Override
+	public void visit(FormalParameterDeclaration formalParameterDeclaration) {
+		Obj varObj = formalParameterDeclaration.getVarDeclForType().obj;
+		varObj.setFpPos(formalParamCnt);
+		++formalParamCnt;
+	}
+	
+	@Override
+	public void visit(MethTypeName methTypeName) {
+		String name    = methTypeName.getName();
+		Struct retType = methTypeName.getMethRetType().struct;
+		Obj newObj = insertAndCheck(Obj.Meth, name, retType, methTypeName);
+		methTypeName.obj = newObj;
+		formalParamCnt = 0;
+		Tab.openScope();
+	}
+	
+	@Override
+	public void visit(TypeMethod typeMethod) {
+		typeMethod.struct = typeMethod.getType().struct;
+	}
+	
+	@Override
+	public void visit(VoidMethod voidMethod) {
+		voidMethod.struct = Table.noType;
+	}
+	
+//Type=====================================================================================================
+	public void visit(Type type) {
+		Obj typeNode = Tab.find(type.getTypeName());
+		
+		if (typeNode == Table.noObj) {
+			report_error("Nije pronadjen tip " + type.getTypeName() + " u tabeli simbola", null);
+			type.struct = Table.noType;
+		} 
+		else {
+			if (Obj.Type == typeNode.getKind()) {
+				type.struct = typeNode.getType();
+			} 
+			else {
+				report_error("Greska: Ime " + type.getTypeName() + " ne predstavlja tip ", type);
+				type.struct = Table.noType;
+			}
+		}  
+	}
+	
+//Statements=====================================================================================================
+
+	@Override
+	public void visit(ReadStatement readStatement) {
+		Struct argType = readStatement.getDesignator().obj.getType();
+		if(argType.getKind() == Struct.Array) argType = argType.getElemType();
+		
+		if(!argType.compatibleWith(Table.intType) && 
+				!argType.compatibleWith(Table.boolType) && 
+				!argType.compatibleWith(Table.charType)) {
+			report_error("Greska: Tip argumenta", readStatement);
+		}
+	}
+	
+	@Override
+	public void visit(PrintStatemnt printStatemnt) {
+		Struct argType = printStatemnt.getExpr().struct;
+		if(argType.getKind() == Struct.Array) argType = argType.getElemType();
+		
+		if(!argType.compatibleWith(Table.intType) && 
+				!argType.compatibleWith(Table.boolType) && 
+				!argType.compatibleWith(Table.charType)) {
+			report_error("Greska: Tip argumenta", printStatemnt);
+		}
+	}
+	
+	@Override
+	public void visit(AssignDesignatorStatement assignDesignatorStatement) {
+		Designator leftDesignator = assignDesignatorStatement.getDesignator();
+		Obj        leftObj        = leftDesignator.obj;
+		Struct leftType = leftObj.getType();
+		if(leftDesignator instanceof ArrayElemDesignator) leftType = leftType.getElemType();
+		Struct rigtType = assignDesignatorStatement.getExpr().struct;
+		
+		if(leftObj.getKind() != Obj.Var) {
+			report_error("Greska: Sa leve strane = mora da stoji promenljiva", assignDesignatorStatement);
+		}
+		if(!rigtType.assignableTo(leftType)) {
+			report_error("Greska: Tip " + rigtType.toString() + " se ne moze dodeliti tipu " + leftType.toString(), assignDesignatorStatement);
+		}
+	}
+	
+	@Override
+	public void visit(IncDesignatorStatement incDesignatorStatement) {
+		Struct type = incDesignatorStatement.getDesignator().obj.getType();
+		if(type.getKind() == Struct.Array) type = type.getElemType();
+		if(!type.compatibleWith(Table.intType)) {
+			report_error("Greska: Operator ++ se moze primeniti samo na celobrojne promenljive", incDesignatorStatement);
+		}
+	}
+	
+	@Override
+	public void visit(DecDesigntorStatement decDesigntorStatement) {
+		Struct type = decDesigntorStatement.getDesignator().obj.getType();
+		if(type.getKind() == Struct.Array) type = type.getElemType();
+		if(!type.compatibleWith(Table.intType)) {
+			report_error("Greska: Operator -- se moze primeniti samo na celobrojne promenljive", decDesigntorStatement);
+		}
+	}
+	
+	@Override
+	public void visit(VarDesignator varDesignator) {
+		String varName = varDesignator.getVarName();
+		Obj    obj     = checkdefinedInOpenedScopes(varName, varDesignator);
+		
+		int objKind = obj.getKind();
+		
+		if(!(objKind == Obj.Con || objKind == Obj.Fld || objKind == Obj.Var)) {
+			report_error("Greska: Ime " + varName + " ne predstavlja promenljivu ", varDesignator);
+		}
+		
+		varDesignator.obj = obj;
+	}
+	
+	@Override
+	public void visit(ArrayElemDesignator arrayElemDesignator) {
+		arrayElemDesignator.obj = arrayElemDesignator.getArrayName().obj;
+		Struct indexExprType = arrayElemDesignator.getExpr().struct;
+		if(!indexExprType.compatibleWith(Table.intType)) {
+			report_error("Greska: izraz za indeksiranje niza ne vraca celobrojnu vrednost", arrayElemDesignator);
+		}
+	}
+	
+	@Override
+	public void visit(ArrayName arrayName) {
+		String name = arrayName.getName();
+		Obj obj = checkdefinedInOpenedScopes(name, arrayName);
+		
+		if(obj.getType().getKind() != Struct.Array) {
+			report_error("Greska: Ime " + arrayName + " ne predstavlja niz ", arrayName);
+		}
+		
+		arrayName.obj = obj;
+	}
+	
+//Expressions=====================================================================================================
+	@Override
+	public void visit(TermExpression expr) {
+		expr.struct = expr.getExpr1().struct;
+	}
+	
+	@Override
+	public void visit(ConditionalExpression conditionalExpression) {
+		if(!conditionalExpression.getCondFact().getExpr1().struct.compatibleWith(Table.boolType)) {
+			report_error("Greska: uslov mora da bude kompatibilan sa bool tipom", conditionalExpression);
+		}
+		Struct expr1Type = conditionalExpression.getAltExpr1().getExpr1().struct;
+		Struct expr2Type = conditionalExpression.getAltExpr2().getExpr1().struct;
+		if(!expr1Type.compatibleWith(expr2Type)) {
+			report_error("Greska: Izrazi moraju imati kompatibilne povratne vrednosti", conditionalExpression);
+		}
+		conditionalExpression.struct = expr1Type;
+	}
+	
+	@Override
+	public void visit(Expr1 expr1) {
+		TermExprSign termExprSign = expr1.getExpr1FirstTerm().getTermExprSign();
+		Term         term         = expr1.getExpr1FirstTerm().getTerm();
+		//AddopTermList addopTermList = expr1.getAddopTermList();
+		if(termExprSign instanceof NegatedExpression && !term.struct.compatibleWith(Table.intType)) {
+			report_error("Greska: Operator nije definisan za tip" + term.struct.toString(), expr1);
+		}
+		expr1.struct = term.struct;
+	}
+	
+	@Override
+	public void visit(AddopTerm addopTerm) {
+		Struct termType = addopTerm.getTerm().struct;
+		if(!(termType.compatibleWith(Table.intType) || termType.compatibleWith(Table.charType))) {
+			report_error("Greska: Nije definisan operator za tip" + termType, addopTerm);
+		}
+		addopTerm.struct = termType;
+	}
+	
+//Terms and Factors=====================================================================================================
+	@Override
+	public void visit(Term term) {
+		Struct     factorType = term.getFactor().struct;
+		FactorList factorList = term.getFactorList();
+		
+		if(factorList instanceof MultipleFactors) {
+			if(!(factorType.compatibleWith(Table.intType))) {
+				report_error("Greska: Operator nije definisan za tip" + factorType.toString(), term);
+			}
+		}
+		term.struct = factorType;
+	}
+	
+	@Override
+	public void visit(MulopFactor mulopFactor) {
+		Struct factorType = mulopFactor.getFactor().struct;
+		if(!factorType.compatibleWith(Table.intType)) {
+			report_error("Greska: Operator nije definisan za tip" + factorType.toString(), mulopFactor);
+		}
+	}
+	
+	@Override
+	public void visit(DesignatorFactor designatorFactor) {
+		Designator designator   = designatorFactor.getDesignator();
+		designatorFactor.struct = designator.obj.getType();
+		if(designator instanceof ArrayElemDesignator) 
+			designatorFactor.struct = designatorFactor.struct.getElemType();
+	}
+	
+	@Override
+	public void visit(NumFactor numFactor) {
+		numFactor.struct = Table.intType;
+	}
+	
+	@Override
+	public void visit(CharFactor charFactor) {
+		charFactor.struct = Table.charType;
+	}
+	
+	@Override
+	public void visit(BoolFactor boolFactor) {
+		boolFactor.struct = Table.boolType;
+	}
+	
+	@Override
+	public void visit(ExpressionFactor expressionFactor) {
+		expressionFactor.struct = expressionFactor.getExpr().struct;
+	}
+	
+	@Override
+	public void visit(NewArrayFactor newArrayFactor) {
+		String arrayTypeName = newArrayFactor.getTypeName();
+		Obj arrayElemType = checkdefinedInOpenedScopes(arrayTypeName, newArrayFactor);
+		
+		if(arrayElemType.getKind() != Obj.Type) {
+			report_error("Greska: Ime " + arrayTypeName + " ne predstavlja tip ", newArrayFactor);
+		}
+		
+		newArrayFactor.struct = new Struct(Struct.Array, arrayElemType.getType());
+		
+		Expr arraySizeExpr = newArrayFactor.getExpr();
+		
+		if(!arraySizeExpr.struct.compatibleWith(Table.intType)) {
+			report_error("Greska: izraz za duzinu niza ne vraca celobrojnu vrednost", newArrayFactor);
+		}
+	}
+	
+	private Obj checkdefinedInOpenedScopes(String name, SyntaxNode syntaxNode) {
+		Obj ret = Table.findInOpenedScopes(name);
+		if(ret == Table.noObj) {
+			report_error("Greska: Ime " + name + " nije definisano u tekucem opsegu ", syntaxNode);
+		}
+		return ret;
+	}
+	
+	private Obj insertAndCheck(int kind, String name, Struct type, SyntaxNode syntaxNode) {
+		if(Table.isDefinedInCurrentScope(name)) {
+			report_error("Ime " + name + " je vec deklarisano u tekucem opsegu ", syntaxNode);
+			return Tab.noObj;
+		}
+		return Table.insert(kind, name, type);
+	}
+	
+	public boolean passed() {
+		return !errorDetected;
+	}
+}
+
+

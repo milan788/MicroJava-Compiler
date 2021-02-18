@@ -1,0 +1,21 @@
+program StatementsTest;
+
+const int I = 5;
+int i = 2;
+bool b = true;
+char c1 = 'a';
+char c2;
+int arrI[];
+
+int main() {
+	read(i)
+	print(A);
+	
+	i++;
+	i--;
+	
+	arrI = new int[4];
+	arrI[0] = 10; 
+	
+	c2 = c1 + 22*3/i + i - arrI[0] + b?5: 0;
+}

@@ -1,0 +1,169 @@
+package rs.ac.bg.etf.pp1;
+
+import rs.ac.bg.etf.pp1.CounterVisitor.FormParamCounter;
+import rs.ac.bg.etf.pp1.CounterVisitor.VarCounter;
+import rs.ac.bg.etf.pp1.ast.*;
+import rs.etf.pp1.mj.runtime.Code;
+import rs.etf.pp1.symboltable.Tab;
+import rs.etf.pp1.symboltable.concepts.Obj;
+import rs.etf.pp1.symboltable.concepts.Struct;
+
+public class CodeGenerator extends VisitorAdaptor {
+	private int mainPc;
+	
+	public int getMainPc(){
+		return mainPc;
+	}
+	
+	@Override
+	public void visit(MethTypeName methodTypeName) {
+		if("main".equalsIgnoreCase(methodTypeName.getName())){
+			mainPc = Code.pc;
+		}
+		methodTypeName.obj.setAdr(Code.pc);
+		// Collect arguments and local variables
+		SyntaxNode methodNode = methodTypeName.getParent();
+	
+		VarCounter varCnt = new VarCounter();
+		methodNode.traverseTopDown(varCnt);
+		
+		FormParamCounter fpCnt = new FormParamCounter();
+		methodNode.traverseTopDown(fpCnt);
+		
+		// Generate the entry
+		Code.put(Code.enter);
+		Code.put(fpCnt.getCount());
+		Code.put(fpCnt.getCount() + varCnt.getCount());
+	}
+	
+	@Override
+	public void visit(MethodDeclaration methodDeclaration){
+		Code.put(Code.exit);
+		Code.put(Code.return_);
+	}
+	
+	@Override
+	public void visit(ReadStatement readStatement) {
+		// TODO Auto-generated method stub
+	}
+	
+	@Override
+	public void visit(PrintStatemnt printStatemnt) {
+		if(printStatemnt.getExpr().struct.equals(Tab.intType)){
+			Code.loadConst(5);
+			Code.put(Code.print);
+		}else{
+			Code.loadConst(1);
+			Code.put(Code.bprint);
+		}
+	}
+	
+	@Override
+	public void visit(AssignDesignatorStatement assignDesignatorStatement) {
+		storeDesignator(assignDesignatorStatement.getDesignator());
+	}
+	
+	@Override
+	public void visit(IncDesignatorStatement incDesignatorStatement) {
+		Designator designator = incDesignatorStatement.getDesignator();
+		Code.loadConst(Code.const_1);
+		loadDesignator(designator);
+		Code.put(Code.add);
+		storeDesignator(designator);
+	}
+	
+	@Override
+	public void visit(DecDesigntorStatement decDesigntorStatement) {
+		Designator designator = incDesignatorStatement.getDesignator();
+		Code.loadConst(Code.const_m1);
+		loadDesignator(designator);
+		Code.put(Code.add);
+		storeDesignator(designator);
+	}
+	
+	@Override
+	public void visit(ArrayElemDesignator arrayElemDesignator) {
+		// TODO Auto-generated method stub
+	}
+	
+	@Override
+	public void visit(MultipleTerms multipleTerms) {
+		Addop addop = multipleTerms.getAddopTerm().getAddop();
+		if(addop instanceof Add) 
+			Code.put(Code.add);
+		else
+			Code.put(Code.sub);
+	}
+	
+	@Override
+	public void visit(MultipleFactors multipleFactors) {
+		Mulop mulop = multipleFactors.getMulopFactor().getMulop();
+		if(mulop instanceof Mul)
+			Code.put(Code.mul);
+		else if(mulop instanceof Div)
+			Code.put(Code.div);
+		else
+			Code.put(Code.rem);
+	}
+	
+	@Override
+	public void visit(DesignatorFactor designatorFactor) {
+		Code.load(designatorFactor.getDesignator().obj);
+	}
+	
+	@Override
+	public void visit(NumFactor numFactor) {
+		Code.loadConst(numFactor.getNumConst().intValue());
+	}
+	
+	@Override
+	public void visit(CharFactor charFactor) {
+		Code.loadConst(charFactor.getCharConst().charValue());
+	}
+	
+	@Override
+	public void visit(BoolFactor boolFactor) {
+		boolean value = boolFactor.getBoolConst().booleanValue();
+		Code.loadConst(value ? 1 : 0);
+	}
+	
+	@Override
+	public void visit(NewArrayFactor newArrayFactor) {
+		Code.put(Code.newarray);
+		if(newArrayFactor.struct == TabOperations.charType) 
+			Code.put(0); 
+		else
+			Code.put(1);
+	}
+	
+	void loadDesignator(Designator designator) {
+		if(designator instanceof VarDesignator)
+			loadVarDesignator((VarDesignator)designator);
+		else
+			loadArryElemDesignator((ArrayElemDesignator)designator);
+	}
+	
+	void loadVarDesignator(VarDesignator varDesignator) {
+		Code.load(varDesignator.obj);
+	}
+	
+	void loadArryElemDesignator(ArrayElemDesignator arrayElemDesignator) {
+	}
+	
+	void storeDesignator(Designator designator) {
+		if(designator instanceof VarDesignator)
+			storeVarDesignator((VarDesignator)designator);
+		else
+			storeArryElemDesignator((ArrayElemDesignator)designator);
+	}
+
+	private void storeVarDesignator(VarDesignator designator) {
+		Code.store(designator.obj);
+	}
+	
+	private void storeArryElemDesignator(ArrayElemDesignator designator) {
+		// TODO Auto-generated method stub
+		
+	}
+
+}

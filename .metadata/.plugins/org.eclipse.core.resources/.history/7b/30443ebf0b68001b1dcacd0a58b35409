@@ -1,0 +1,39 @@
+package rs.ac.bg.etf.pp1;
+
+import rs.ac.bg.etf.pp1.ast.*;
+import rs.etf.pp1.mj.runtime.Code;
+
+public class CodeGenerator extends VisitorAdaptor {
+	private int mainPc;
+	
+	public int getMainPc(){
+		return mainPc;
+	}
+	
+	@Override
+	public void visit(MultipleFactors multipleFactors) {
+		Mulop mulop = multipleFactors.getMulopFactor().getMulop();
+		if()
+	}
+	
+	@Override
+	public void visit(VarDesignator varDesignator) {
+		Code.load(varDesignator.obj);
+	}
+	
+	@Override
+	public void visit(NumFactor numFactor) {
+		Code.loadConst(numFactor.getNumConst().intValue());
+	}
+	
+	@Override
+	public void visit(CharFactor CharFactor) {
+		
+	}
+	
+	@Override
+	public void visit(BoolFactor boolFactor) {
+		boolean value = boolFactor.getBoolConst().booleanValue();
+		Code.loadConst(value ? 1 : 0);
+	}
+}

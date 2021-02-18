@@ -1,0 +1,24 @@
+program read_test
+	int ai[];
+	char c;
+{
+	void main() 
+		int i;
+		char ac[];
+	{
+		ai = new int[2];
+		ac = new char[2];
+		
+		read(i);
+		read(ai[0]);
+		
+		read(c);
+		read(ac[1]);
+		
+		print(i);
+		print(ai[0]);
+		
+		print(c);
+		print(ac[1]);
+	}
+}

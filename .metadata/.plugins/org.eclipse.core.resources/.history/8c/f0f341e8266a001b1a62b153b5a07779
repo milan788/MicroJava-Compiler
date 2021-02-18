@@ -1,0 +1,49 @@
+package rs.ac.bg.etf.pp1;
+
+import rs.etf.pp1.symboltable.Tab;
+import rs.etf.pp1.symboltable.concepts.Obj;
+import rs.etf.pp1.symboltable.concepts.Scope;
+import rs.etf.pp1.symboltable.concepts.Struct;
+
+public class Table extends Tab {
+	//public static Struct noType, intType, charType, nullType, boolType;
+	public static final Struct boolType	= new Struct(Struct.Bool);;
+	public static void init() {
+		//noType = Tab.noType;
+		//intType = Tab.intType;
+		//charType = Tab.charType;
+		//nullType = Tab.nullType;
+		Tab.currentScope().addToLocals(new Obj(Obj.Type, "bool", boolType));
+	}
+	
+	public static Obj find(String name) {
+		return Tab.find(name);
+	}
+	
+	public static boolean isDefinedInCurrentScope(String name) {
+		return findInCurrentScope(name) != Tab.noObj;
+	}
+
+	public static Obj findInCurrentScope(String name) {
+		Obj ret = currentScope.findSymbol(name);		
+		return ret != null ? ret : Tab.noObj;
+	}
+	
+	public static boolean isDefinedInOpenedScopes(String name) {
+		return findInOpenedScopes(name) != Tab.noObj;
+	}
+	
+	public static Obj findInOpenedScopes(String name) {
+		Obj ret = null;
+		for(Scope currentScope = Tab.currentScope; currentScope != null; currentScope = currentScope.getOuter()) {
+			ret = currentScope.findSymbol(name);
+			if(ret != null) return ret;
+		}
+		return Tab.noObj;
+	}
+
+	public static Obj insert(int kind, String name, Struct type) {
+		if(isDefinedInCurrentScope(name)) return Tab.noObj;
+		return Tab.insert(kind, name, type);
+	}
+}

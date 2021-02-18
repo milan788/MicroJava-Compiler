@@ -1,0 +1,11 @@
+program condFact
+{
+	void main()
+		bool cond;
+	{
+		cond = true;
+		print(cond?1:2);
+		cond = false;
+		print(cond?1:2);
+	}
+}

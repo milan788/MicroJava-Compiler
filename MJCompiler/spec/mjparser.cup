@@ -1,0 +1,248 @@
+package rs.ac.bg.etf.pp1;
+
+import java_cup.runtime.*;
+import org.apache.log4j.*;
+
+// import java.io.*;
+import rs.ac.bg.etf.pp1.ast.*;
+
+parser code {:
+	
+	boolean errorDetected = false;
+	
+	Logger log = Logger.getLogger(getClass());
+   
+   
+    // slede redefinisani metodi za prijavu gresaka radi izmene teksta poruke
+     
+    public void report_fatal_error(String message, Object info) throws java.lang.Exception {
+      done_parsing();
+      report_error(message, info);
+    }
+  
+    public void syntax_error(Symbol cur_token) {
+        report_error("\nSintaksna greska", cur_token);
+    }
+  
+    public void unrecovered_syntax_error(Symbol cur_token) throws java.lang.Exception {
+        report_fatal_error("Fatalna greska, parsiranje se ne moze nastaviti", cur_token);
+    }
+
+    public void report_error(String message, Object info) {
+    	errorDetected = true;
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.error(msg.toString());
+    }
+    
+    public void report_info(String message, Object info) {
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.info(msg.toString());
+    }
+    
+:}
+
+scan with {:
+	Symbol s = this.getScanner().next_token();
+	if (s != null && s.value != null) 
+		log.info(s.toString() + " " + s.value.toString());
+	return s;
+:}
+
+init with {:
+	errorDetected = false;
+:}
+
+terminal PROG;
+terminal CONST;
+terminal PRINT, READ;
+terminal ADD, SUB;
+terminal MUL, DIV, MOD;
+terminal EQ, NE, GT, GE, LT, LE;
+terminal ASSIGN;
+terminal INC, DEC;
+terminal SEMI, QMARK, COLON, COMMA;
+terminal NEW;
+terminal LCURLY, RCURLY, LROUND, RROUND, LSQUARE, RSQUARE;
+terminal VOID, RETURN;
+terminal TRUE, FALSE;
+terminal Integer NUM;
+terminal String IDENT;
+terminal Boolean BOOL;
+terminal Character CHAR;
+
+nonterminal ConstDeclList, VarDeclList, MethodDeclList;
+nonterminal ConstDeclListType, ConstDeclListForType;
+nonterminal VarDeclType, VarDeclListForType;
+
+nonterminal MethodDecl, FormalParams, StmntList;
+nonterminal FormalParamList;
+nonterminal FormalParameterDeclaration;
+
+nonterminal Stmnt;
+nonterminal DesignatorStmnt, Print, PrintExprKind;
+
+nonterminal FactorList;
+nonterminal MulopFactor;
+
+nonterminal Expr1FirstTerm, TermExprSign, AddopTermList, CondFact, AltExpr1, AltExpr2;
+
+nonterminal Relop, Addop, Mulop;
+
+nonterminal rs.etf.pp1.symboltable.concepts.Obj Program, ProgName, VarDeclForType, MethTypeName, Designator, ArrayName;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Type, ConstDeclForType, MethRetType, Expr, Factor, Term, AddopTerm, Expr1;
+
+//Program=============================================================================================================
+Program ::= (Program) PROG ProgName:progName ConstDeclList VarDeclList LCURLY MethodDeclList RCURLY;
+
+ProgName ::= (ProgName) IDENT:progName;
+
+//Const declarations==================================================================================================
+ConstDeclList ::= (ConstDeclarations) ConstDeclList CONST ConstDeclListType ConstDeclListForType SEMI
+			      |
+				  (NoConstDeclarations) /*epsilon*/;
+
+ConstDeclListType ::= (ConstDeclarationsType) Type;
+
+ConstDeclListForType ::= (ConstDeclationsForType) ConstDeclListForType COMMA ConstDeclForType 
+					     |
+						 (SingleConstDeclationForType) ConstDeclForType;
+
+ConstDeclForType ::= (ConstDeclarionForInt) IDENT:constName ASSIGN NUM:numConst
+					 |
+					 (ConstDeclarionForChar) IDENT:constName ASSIGN CHAR:charConst
+					 |
+					 (ConstDeclarionForBool) IDENT:constName ASSIGN BOOL:boolConst;
+
+//Var declarations=====================================================================================================
+
+VarDeclList ::= (VarDeclarations) VarDeclList VarDeclType VarDeclListForType SEMI
+				|
+		  		(ErrorVarDeclList) error SEMI:l
+		  		{: parser.report_error("Izvrsen oporavak do ; u liniji " + lleft, null);  :}
+				|
+				(NoVarDeclarations) /* epsilon */;
+
+VarDeclType ::= (VarDeclarationType) Type;
+
+VarDeclListForType ::= (VarDeclarationsForType) VarDeclListForType COMMA VarDeclForType
+					   |
+					   (SingleVarDeclarationForType) VarDeclForType;
+				
+VarDeclForType ::= (VarDeclarationForType) IDENT:varName
+				   |
+				   (ArrayDeclarationForType) IDENT:varName LSQUARE RSQUARE;
+
+Type ::= (Type) IDENT:typeName;
+
+//Method declarations=====================================================================================================
+
+MethodDeclList ::= (MethodDeclarations) MethodDeclList MethodDecl
+				   |
+				   (NoMethodDeclaration) /*epsilon*/;
+
+MethodDecl ::= (MethodDeclaration) MethTypeName LROUND FormalParams RROUND VarDeclList LCURLY StmntList RCURLY;
+
+MethTypeName ::= (MethTypeName) MethRetType IDENT:name;
+
+MethRetType ::= (TypeMethod) Type
+				|
+				(VoidMethod) VOID;
+
+FormalParams ::= (FormalParameters) FormalParamList
+				 |
+				 (NoFormalParameters) /*epsilon*/;
+
+FormalParamList ::= (FormalParameterList) FormalParamList COMMA FormalParameterDeclaration
+					|
+					(SingleFormalParameter) FormalParameterDeclaration;
+
+FormalParameterDeclaration ::= (FormalParameterDeclaration) VarDeclType VarDeclForType;
+
+//Statements=====================================================================================================
+
+StmntList ::= (StatementList) StmntList Stmnt
+			  |
+			  (NoStatement) /*epsilon*/;
+
+Stmnt ::= (DesignatorStatement) DesignatorStmnt SEMI
+		  |
+		  (ReadStatement) READ LROUND Designator RROUND SEMI
+		  |
+		  (PrintStatemnt) Print LROUND Expr PrintExprKind RROUND SEMI;
+
+Print ::= (Print) PRINT;
+
+DesignatorStmnt ::= (AssignDesignatorStatement) Designator ASSIGN Expr
+				    |
+					(IncDesignatorStatement) Designator INC
+					|
+					(DecDesigntorStatement) Designator DEC
+		  			|
+		  			(ErrorDesignatorStmnt) error SEMI:l
+		  			{: parser.report_error("Izvrsen oporavak do ; u liniji " + lleft, null);  :};
+
+PrintExprKind ::= (PrintOneTimeExpr)
+			  	  |
+			  	  (PrintMultipleTimesExpr) COMMA NUM:numOfTimes;
+
+Designator ::= (VarDesignator) IDENT:varName
+			   |
+			   (ArrayElemDesignator) ArrayName LSQUARE Expr RSQUARE;
+
+ArrayName ::= (ArrayName) IDENT:name;
+
+//Expressions=====================================================================================================
+
+Expr ::= (TermExpression) Expr1
+		 |
+		 (ConditionalExpression) CondFact QMARK AltExpr1 COLON AltExpr2;
+
+CondFact ::= (CondFact) Expr1;
+AltExpr1 ::= (AltExpr1) Expr1;
+AltExpr2 ::= (AltExpr2) Expr1;
+
+Expr1 ::= (Expr1) Expr1FirstTerm AddopTermList;
+
+Expr1FirstTerm ::= (Expr1FirstTerm) TermExprSign Term;
+
+TermExprSign ::= (NegatedExpression) SUB
+				 |
+				 (NotNegatedExpression) /*epsilon*/;
+
+AddopTermList ::= (MultipleTerms) AddopTermList AddopTerm
+				  |
+				  (NoMoreTerms) /*epsilon*/;
+
+AddopTerm ::= (AddopTerm) Addop Term;
+
+//Terms and Factors=====================================================================================================
+
+Term ::= (Term) Factor FactorList;
+
+FactorList ::= (MultipleFactors) FactorList MulopFactor
+			   |
+			   (NoMoreFactors) /*epsilon*/;
+
+MulopFactor ::= (MulopFactor) Mulop Factor;
+
+Factor ::= (DesignatorFactor) Designator
+		   |
+		   (NumFactor) NUM:numConst
+		   |
+		   (CharFactor) CHAR:charConst
+		   |
+		   (BoolFactor) BOOL:boolConst
+		   |
+		   (ExpressionFactor) LROUND Expr RROUND
+		   |
+		   (NewArrayFactor) NEW IDENT:typeName LSQUARE Expr RSQUARE;
+
+//Operators=====================================================================================================
+
+Relop ::= (Eq) EQ | (Ne) NE | (Gt) GT | (Ge) GE | (Lt) LT | (Le) LE;
+Addop ::= (Add) ADD | (SUB) SUB;
+Mulop ::= (Mul) MUL | (Div) DIV | (Mod) MOD;

@@ -1,0 +1,26 @@
+program StatementsTest
+const int I = 5;
+const bool B = false;
+int i;
+bool b;
+char c1;
+char c2;
+int arrI[];
+{
+	void main() {
+		i = 2;
+		b = true;
+		c1 = 'a';
+		arrI = new int[4];
+	
+		read(i);
+		print(I);
+	
+		i++;
+		i--;
+	
+		arrI[0] = 10; 
+	
+		c2 = c1 + 22*3/i + i - arrI[I] + (b?5: 0) + (B?i:i+2)*2;
+	}
+}
